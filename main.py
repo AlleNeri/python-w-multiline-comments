@@ -43,13 +43,20 @@ def split_code_every_multiline_comment(filename) -> Generator[tuple[str, Literal
                     else: code += line
                 yield (code, "code")
 
+def is_code_to_execute(snippet: str) -> bool:
+    # check if the snippet starts with a comment with `pwmc:disable` or not
+    snippet = snippet.strip()
+    return not (snippet.startswith("# pwmc:no_exec") or snippet.startswith("#pwmc:no_exec"))
+
 def python_w_multiline_comments(filename: str, interactive: bool = False):
     console = PersistentPythonConsole()
     for code_or_comment, type_ in split_code_every_multiline_comment(filename):
         if type_ == "comment": print(f"[bold white]{code_or_comment}[/bold white]", end="")
         elif type_ == "code":
             # execute the code and print the output
-            try: console.execute(code_or_comment)
+            try:
+                if not is_code_to_execute(code_or_comment): print(f"[green]Code not executed[/green]")
+                else: console.execute(code_or_comment)
             except Exception as e: print(f"[bold dark_orange3]An error occurred:[/bold dark_orange3]\n[bold red]{e}[/bold red]")
         if interactive:
             in_val = input()

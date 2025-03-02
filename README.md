@@ -7,7 +7,9 @@ main.py [TARGET] [-i]
 ```
 It prints the multiline comments from the `[TARGET]` file and executes the script snippets.
 If the `-i` flag is present, it will execute the script interactively.
+Typing `q` will exit the interactive mode.
+Single line comments in the form of `# pwmc:no_exec` at the start of a code snippet will prevent it from being executed.
 
 ## Warning
 This script doesn't have any kind of security check on the code snippets from `[TARGET]` file.
-Be careful when using it.
+It is recommended to only use this script with trusted files.
