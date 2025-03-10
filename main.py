@@ -9,8 +9,47 @@ class PersistentPythonConsole:
     def __init__(self):
         self.locals = {}
 
-    def execute(self, code: str):
-        exec(code, self.locals)
+    class NoPlotsContext:
+        def __enter__(self):
+            import matplotlib.pyplot as plt
+            self.original_show = plt.show
+            plt.show = lambda *_, **__: None
+
+        def __exit__(self, _, __, ___):
+            import matplotlib.pyplot as plt
+            plt.show = self.original_show
+            plt.close("all")
+
+    def execute(self, code: str, suppress_plots: bool = False):
+        if suppress_plots:
+            with self.NoPlotsContext():
+                exec(code, self.locals)
+        else: exec(code, self.locals)
+
+class FastForwardHandler:
+    def __init__(self, fast_forward: int | str):
+        self.fast_forward = fast_forward
+        self.snippet_counter = 0
+        self.snippet_to_fast_forward_passed = False
+
+    def increment_snippet_counter(self):
+        self.snippet_counter += 1
+
+    def is_snippet_to_fast_forward_passed(self, comment: str | None = None) -> bool:
+        if not comment or self.snippet_to_fast_forward_passed: return self.snippet_to_fast_forward_passed
+        if type(self.fast_forward) is str and self.fast_forward in comment:
+            self.snippet_to_fast_forward_passed = True
+        return self.snippet_to_fast_forward_passed
+
+    def is_fast_forwarding(self) -> bool:
+        if type(self.fast_forward) is int and self.snippet_counter <= self.fast_forward: return True
+        if type(self.fast_forward) is str and not self.snippet_to_fast_forward_passed: return True
+        return False
+
+    def check_fast_forward(self):
+        if type(self.fast_forward) is int and self.snippet_counter <= self.fast_forward: return True
+        if type(self.fast_forward) is str and not self.snippet_to_fast_forward_passed: return True
+        return False
 
 class RequiresInteractive(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
@@ -68,24 +107,21 @@ def is_code_to_execute(snippet: str) -> bool:
 
 def python_w_multiline_comments(filename: str, interactive: bool = False, fast_forward: str | int | None = None):
     console = PersistentPythonConsole()
-    snippet_counter = 0
-    snippet_to_fast_forward_passed = False
+    fast_forward_handler = FastForwardHandler(fast_forward) if fast_forward else None
     for code_or_comment, type_ in split_code_every_multiline_comment(filename):
         if type_ == SnippetType.comment:
             print(f"[bold white]{code_or_comment}[/bold white]", end="")
-            if interactive and fast_forward and type(fast_forward) is str and fast_forward in code_or_comment:
-                snippet_to_fast_forward_passed = True
+            if interactive and fast_forward_handler:
+                fast_forward_handler.is_snippet_to_fast_forward_passed(code_or_comment)
         elif type_ == SnippetType.code:
             # execute the code and print the output
             try:
                 if not is_code_to_execute(code_or_comment): print(f"[green]Code not executed[/green]")
-                else: console.execute(code_or_comment)
+                else: console.execute(code_or_comment, suppress_plots=fast_forward_handler.is_fast_forwarding() if fast_forward_handler else False)
             except Exception as e: print(f"[bold dark_orange3]An error occurred:[/bold dark_orange3]\n[bold red]{e}[/bold red]")
-        snippet_counter += 1
+        if fast_forward_handler: fast_forward_handler.increment_snippet_counter()
         if interactive:
-            if fast_forward:
-                if type(fast_forward) is int and snippet_counter <= fast_forward: continue
-                if type(fast_forward) is str and not snippet_to_fast_forward_passed: continue
+            if fast_forward_handler and fast_forward_handler.check_fast_forward(): continue
             in_val = input()
             if in_val == "q": break
 
