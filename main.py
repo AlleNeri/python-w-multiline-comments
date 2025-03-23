@@ -22,8 +22,7 @@ class PersistentPythonConsole:
 
     def execute(self, code: str, suppress_plots: bool = False):
         if suppress_plots:
-            with self.NoPlotsContext():
-                exec(code, self.locals)
+            with self.NoPlotsContext(): exec(code, self.locals)
         else: exec(code, self.locals)
 
 class FastForwardHandler:
@@ -37,8 +36,7 @@ class FastForwardHandler:
 
     def is_snippet_to_fast_forward_passed(self, comment: str | None = None) -> bool:
         if not comment or self.snippet_to_fast_forward_passed: return self.snippet_to_fast_forward_passed
-        if type(self.fast_forward) is str and self.fast_forward in comment:
-            self.snippet_to_fast_forward_passed = True
+        if type(self.fast_forward) is str and self.fast_forward in comment: self.snippet_to_fast_forward_passed = True
         return self.snippet_to_fast_forward_passed
 
     def is_fast_forwarding(self) -> bool:
@@ -46,15 +44,9 @@ class FastForwardHandler:
         if type(self.fast_forward) is str and not self.snippet_to_fast_forward_passed: return True
         return False
 
-    def check_fast_forward(self):
-        if type(self.fast_forward) is int and self.snippet_counter <= self.fast_forward: return True
-        if type(self.fast_forward) is str and not self.snippet_to_fast_forward_passed: return True
-        return False
-
 class RequiresInteractive(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        if not namespace.interactive:
-            parser.error(f"{option_string} requires the interactive mode")
+        if not namespace.interactive: parser.error(f"{option_string} requires the interactive mode")
         setattr(namespace, self.dest, values)
 
 def parse_fast_forward(ff: str) -> str | int:
@@ -87,13 +79,11 @@ def split_code_every_multiline_comment(filename) -> Generator[tuple[str, Snippet
                 # multiline comment
                 multiline_comment: str = ""
                 # single line multiline comment :(
-                if len(line) > 4 and line.endswith(END_COMMENT):
-                    multiline_comment = line[3:-4] + "\n"
+                if len(line) > 4 and line.endswith(END_COMMENT): multiline_comment = line[3:-4] + "\n"
                 else:
                     # if the comment starts in the next line than discard the first line with only `"""`
                     # otherwise remove the `"""` from the first line and add the rest of the line to the comment
-                    if line != (START_COMMENT + '\n'):
-                        multiline_comment = line[3:]
+                    if line != (START_COMMENT + '\n'): multiline_comment = line[3:]
                     # iterate over the lines until the end of the comment
                     while True:
                         line = f.readline()
@@ -124,19 +114,19 @@ def python_w_multiline_comments(filename: str, interactive: bool = False, fast_f
     fast_forward_handler = FastForwardHandler(fast_forward) if fast_forward else None
     for code_or_comment, type_ in split_code_every_multiline_comment(filename):
         if type_ == SnippetType.comment:
-            print(f"[bold white]{code_or_comment}[/bold white]", end="" if interactive else "\n")
-            if interactive and fast_forward_handler:
-                fast_forward_handler.is_snippet_to_fast_forward_passed(code_or_comment)
+            print(f"[bold white]{code_or_comment}[/bold white]", end="")
+            if interactive and fast_forward_handler: fast_forward_handler.is_snippet_to_fast_forward_passed(code_or_comment)
         elif type_ == SnippetType.code:
             # execute the code and print the output
             try:
                 if not is_code_to_execute(code_or_comment): print(f"[green]Code not executed[/green]")
                 else: console.execute(code_or_comment, suppress_plots=fast_forward_handler.is_fast_forwarding() if fast_forward_handler else False)
-                if not interactive: print()
             except Exception as e: print(f"[bold dark_orange3]An error occurred:[/bold dark_orange3]\n[bold red]{e}[/bold red]")
-        if fast_forward_handler: fast_forward_handler.increment_snippet_counter()
+        if fast_forward_handler and fast_forward_handler.is_fast_forwarding(): fast_forward_handler.increment_snippet_counter()
         if interactive:
-            if fast_forward_handler and fast_forward_handler.check_fast_forward(): continue
+            if fast_forward_handler and fast_forward_handler.is_fast_forwarding():
+                print() # separate the snippets
+                continue
             in_val = input()
             if in_val == "q": break
 
