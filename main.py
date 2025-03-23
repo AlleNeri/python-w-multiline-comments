@@ -124,7 +124,7 @@ def python_w_multiline_comments(filename: str, interactive: bool = False, fast_f
     fast_forward_handler = FastForwardHandler(fast_forward) if fast_forward else None
     for code_or_comment, type_ in split_code_every_multiline_comment(filename):
         if type_ == SnippetType.comment:
-            print(f"[bold white]{code_or_comment}[/bold white]")
+            print(f"[bold white]{code_or_comment}[/bold white]", end="" if interactive else "\n")
             if interactive and fast_forward_handler:
                 fast_forward_handler.is_snippet_to_fast_forward_passed(code_or_comment)
         elif type_ == SnippetType.code:
@@ -132,7 +132,7 @@ def python_w_multiline_comments(filename: str, interactive: bool = False, fast_f
             try:
                 if not is_code_to_execute(code_or_comment): print(f"[green]Code not executed[/green]")
                 else: console.execute(code_or_comment, suppress_plots=fast_forward_handler.is_fast_forwarding() if fast_forward_handler else False)
-                print()
+                if not interactive: print()
             except Exception as e: print(f"[bold dark_orange3]An error occurred:[/bold dark_orange3]\n[bold red]{e}[/bold red]")
         if fast_forward_handler: fast_forward_handler.increment_snippet_counter()
         if interactive:
