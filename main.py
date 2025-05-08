@@ -2,6 +2,7 @@
 import argparse
 from enum import Enum
 from typing import Generator
+
 from rich import print
 
 # persistent python console
@@ -100,7 +101,19 @@ def split_code_every_multiline_comment(filename) -> Generator[tuple[str, Snippet
                 code = line
                 while True:
                     line = f.readline()
-                    if not line or START_COMMENT in line: break
+                    # EOF reached
+                    if not line: break
+                    # line is a multiline comment
+                    elif line.startswith(START_COMMENT):
+                        # if it's a docstring, ignore it; otherwise break the loop
+                        prev_line = code.split("\n")[-2].strip()
+                        if prev_line.endswith(":") and (prev_line.startswith("def ") or prev_line.startswith("class ")):
+                            # consume all the lines until the end of the docstring
+                            while True:
+                                if line.endswith(END_COMMENT):
+                                    break
+                                line = f.readline()
+                        else: break
                     else: code += line
                 yield (code, SnippetType.code)
 
