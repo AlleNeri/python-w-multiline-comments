@@ -47,7 +47,7 @@ class FastForwardHandler:
 
 class RequiresInteractive(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        if not namespace.interactive: parser.error(f"{option_string} requires the interactive mode")
+        if hasattr(namespace, 'all') and namespace.all: parser.error(f"{option_string} requires the interactive mode")
         setattr(namespace, self.dest, values)
 
 def parse_fast_forward(ff: str) -> str | int:
@@ -57,7 +57,7 @@ def parse_fast_forward(ff: str) -> str | int:
 def argparse_setup() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Execute python script printing also the multiline comments")
     parser.add_argument("filename", type=str, help="The python file to execute")
-    parser.add_argument("-i", "--interactive", action="store_true", help="Run the script in interactive mode")
+    parser.add_argument("-a", "--all", action="store_true", help="Run all the script in non-interactive mode")
     parser.add_argument("-ff", "--fast-forward", type=parse_fast_forward, action=RequiresInteractive,
                         help="Fast forward the execution to the Nth snippet or to the comment containing the specified string.\n"
                              "(only in interactive mode)")
@@ -122,7 +122,7 @@ def is_code_to_execute(snippet: str) -> bool:
     snippet = snippet.strip()
     return not (snippet.startswith("# pwmc:no_exec") or snippet.startswith("#pwmc:no_exec"))
 
-def python_w_multiline_comments(filename: str, interactive: bool = False, fast_forward: str | int | None = None):
+def python_w_multiline_comments(filename: str, interactive: bool = True, fast_forward: str | int | None = None):
     console = PersistentPythonConsole()
     fast_forward_handler = FastForwardHandler(fast_forward) if fast_forward else None
     for code_or_comment, type_ in split_code_every_multiline_comment(filename):
@@ -145,4 +145,4 @@ def python_w_multiline_comments(filename: str, interactive: bool = False, fast_f
 
 if __name__ == "__main__":
     args = argparse_setup()
-    python_w_multiline_comments(args.filename, interactive=args.interactive, fast_forward=args.fast_forward)
+    python_w_multiline_comments(args.filename, interactive=not args.all, fast_forward=args.fast_forward)
