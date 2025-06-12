@@ -37,7 +37,7 @@ class FastForwardHandler:
 
     def is_snippet_to_fast_forward_passed(self, comment: str | None = None) -> bool:
         if not comment or self.snippet_to_fast_forward_passed: return self.snippet_to_fast_forward_passed
-        if type(self.fast_forward) is str and self.fast_forward in comment: self.snippet_to_fast_forward_passed = True
+        if type(self.fast_forward) is str and self.fast_forward in comment.lower(): self.snippet_to_fast_forward_passed = True
         return self.snippet_to_fast_forward_passed
 
     def is_fast_forwarding(self) -> bool:
@@ -52,7 +52,7 @@ class RequiresInteractive(argparse.Action):
 
 def parse_fast_forward(ff: str) -> str | int:
     try: return int(ff)
-    except ValueError: return ff
+    except ValueError: return ff.lower()
 
 def argparse_setup() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Execute python script printing also the multiline comments")
