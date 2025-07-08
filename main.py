@@ -1,14 +1,21 @@
 #!/bin/python
 import argparse
 from enum import Enum
+import os
+import sys
 from typing import Generator
 
 from rich import print
 
 # persistent python console
 class PersistentPythonConsole:
-    def __init__(self):
+    def __init__(self, module_path: list[str] | None = None):
         self.locals = {}
+        if module_path:
+            # add the search path to the sys.path
+            for path in module_path:
+                if os.path.exists(path) and path not in sys.path: sys.path.append(path)
+                else: print(f"[bold red]Path {path} is not a directory or already in sys.path[/bold red]")
 
     class NoPlotsContext:
         def __enter__(self):
@@ -61,6 +68,8 @@ def argparse_setup() -> argparse.Namespace:
     parser.add_argument("-ff", "--fast-forward", type=parse_fast_forward, action=RequiresInteractive,
                         help="Fast forward the execution to the Nth snippet or to the comment containing the specified string.\n"
                              "(only in interactive mode)")
+    parser.add_argument("-l", "--load-path", type=str, nargs="*", default=None,
+                        help="Additional paths to load modules from. If not specified, the current directory is used.")
     return parser.parse_args()
 
 class SnippetType(Enum):
@@ -122,8 +131,9 @@ def is_code_to_execute(snippet: str) -> bool:
     snippet = snippet.strip()
     return not (snippet.startswith("# pwmc:no_exec") or snippet.startswith("#pwmc:no_exec"))
 
-def python_w_multiline_comments(filename: str, interactive: bool = True, fast_forward: str | int | None = None):
-    console = PersistentPythonConsole()
+def python_w_multiline_comments(filename: str, interactive: bool = True, fast_forward: str | int | None = None, module_path: list[str] | None = None):
+    if module_path is None: module_path = ["."]  # default to current directory
+    console = PersistentPythonConsole(module_path)
     fast_forward_handler = FastForwardHandler(fast_forward) if fast_forward else None
     for code_or_comment, type_ in split_code_every_multiline_comment(filename):
         if type_ == SnippetType.comment:
@@ -145,4 +155,4 @@ def python_w_multiline_comments(filename: str, interactive: bool = True, fast_fo
 
 if __name__ == "__main__":
     args = argparse_setup()
-    python_w_multiline_comments(args.filename, interactive=not args.all, fast_forward=args.fast_forward)
+    python_w_multiline_comments(args.filename, interactive=not args.all, fast_forward=args.fast_forward, module_path=args.load_path)
