@@ -52,23 +52,19 @@ class FastForwardHandler:
         if type(self.fast_forward) is str and not self.snippet_to_fast_forward_passed: return True
         return False
 
-class RequiresInteractive(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string=None):
-        if hasattr(namespace, 'all') and namespace.all: parser.error(f"{option_string} requires the interactive mode")
-        setattr(namespace, self.dest, values)
-
 def parse_fast_forward(ff: str) -> str | int:
     try: return int(ff)
     except ValueError: return ff.lower()
 
 def argparse_setup() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Execute python script printing also the multiline comments")
+    parser = argparse.ArgumentParser(description="Execute python script printing also the multiline comments. All the code snippets starting with the single line comment `pwmc:no_exec` won't be executed.")
     parser.add_argument("filename", type=str, help="The python file to execute")
-    parser.add_argument("-a", "--all", action="store_true", help="Run all the script in non-interactive mode")
-    parser.add_argument("-ff", "--fast-forward", type=parse_fast_forward, action=RequiresInteractive,
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("-a", "--all", action="store_true", help="Run all the script in non-interactive mode")
+    group.add_argument("-ff", "--fast-forward", type=parse_fast_forward,
                         help="Fast forward the execution to the Nth snippet or to the comment containing the specified string.\n"
                              "(only in interactive mode)")
-    parser.add_argument("-l", "--load-path", type=str, nargs="*", default=None,
+    parser.add_argument("-l", "--load-path", type=str, nargs="+", default=None,
                         help="Additional paths to load modules from. If not specified, the current directory is used.")
     return parser.parse_args()
 
@@ -127,7 +123,7 @@ def split_code_every_multiline_comment(filename) -> Generator[tuple[str, Snippet
                 yield (code, SnippetType.code)
 
 def is_code_to_execute(snippet: str) -> bool:
-    # check if the snippet starts with a comment with `pwmc:disable` or not
+    # check if the snippet starts with the comment `pwmc:no_exec` or not
     snippet = snippet.strip()
     return not (snippet.startswith("# pwmc:no_exec") or snippet.startswith("#pwmc:no_exec"))
 
@@ -143,7 +139,8 @@ def python_w_multiline_comments(filename: str, interactive: bool = True, fast_fo
             # execute the code and print the output
             try:
                 if not is_code_to_execute(code_or_comment): print(f"[green]Code not executed[/green]")
-                else: console.execute(code_or_comment, suppress_plots=fast_forward_handler.is_fast_forwarding() if fast_forward_handler else False)
+                elif fast_forward_handler: console.execute(code_or_comment, suppress_plots=fast_forward_handler.is_fast_forwarding())
+                else: console.execute(code_or_comment, suppress_plots=not interactive)
             except Exception as e: print(f"[bold dark_orange3]An error occurred:[/bold dark_orange3]\n[bold red]{e}[/bold red]")
         if fast_forward_handler and fast_forward_handler.is_fast_forwarding(): fast_forward_handler.increment_snippet_counter()
         if interactive:
