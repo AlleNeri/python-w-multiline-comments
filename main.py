@@ -103,20 +103,25 @@ START_COMMENT_PREFIXES_PERM = [a + b for a, b in itertools.permutations(START_CO
                             [a + b + c for a, b, c in itertools.permutations(START_COMMENT_PREFIXES, 3)]
 END_COMMENT = START_COMMENT + "\n"
 
+def is_comment_starting(line: str) -> bool:
+    return line.startswith(START_COMMENT) or \
+        any([line.startswith(prefix + START_COMMENT) for prefix in START_COMMENT_PREFIXES]) or \
+        any([line.startswith(prefix + START_COMMENT) for prefix in START_COMMENT_PREFIXES_PERM])
+
 def split_code_every_multiline_comment(filename) -> Generator[tuple[str, SnippetType]]:
     # expecting a file content with code snippets intercalated with multiline comments, separate it and return
     # iterate over the lines
     with open(filename, "r") as f:
         line = f.readline()
         while line:
-            if line.startswith(START_COMMENT) or \
-                any(line.startswith(prefix + START_COMMENT) for prefix in START_COMMENT_PREFIXES) or \
-                any(line.startswith(START_COMMENT + prefix) for prefix in START_COMMENT_PREFIXES_PERM):
+            if is_comment_starting(line):
                 # multiline comment
                 multiline_comment: str = ""
                 # single line multiline comment :(
                 if len(line) > 4 and line.endswith(END_COMMENT): multiline_comment = line[3:-4] + "\n"
                 else:
+                    # consume all the prefixes of the first line
+                    while line.startswith(START_COMMENT): line = line[1:]
                     # if the comment starts in the next line than discard the first line with only `"""`
                     # otherwise remove the `"""` from the first line and add the rest of the line to the comment
                     if line != (START_COMMENT + '\n'): multiline_comment = line[3:]
@@ -139,7 +144,7 @@ def split_code_every_multiline_comment(filename) -> Generator[tuple[str, Snippet
                     # EOF reached
                     if not line: break
                     # line is a multiline comment
-                    elif line.startswith(START_COMMENT):
+                    elif is_comment_starting(line):
                         # if it's a docstring, ignore it; otherwise break the loop
                         prev_line = code.split("\n")[-2].strip()
                         if prev_line.endswith(":") and (prev_line.startswith("def ") or prev_line.startswith("class ")):
