@@ -1,6 +1,7 @@
 #!/bin/python
 import argparse
 from enum import Enum
+import itertools
 import os
 import sys
 from typing import Generator
@@ -73,6 +74,9 @@ class SnippetType(Enum):
     comment = "comment"
 
 START_COMMENT = '"""'
+START_COMMENT_PREFIXES = ['f', 'r', 'u']
+START_COMMENT_PREFIXES_PERM = [a + b for a, b in itertools.permutations(START_COMMENT_PREFIXES, 2)] + \
+                            [a + b + c for a, b, c in itertools.permutations(START_COMMENT_PREFIXES, 3)]
 END_COMMENT = START_COMMENT + "\n"
 
 def split_code_every_multiline_comment(filename) -> Generator[tuple[str, SnippetType]]:
@@ -81,7 +85,9 @@ def split_code_every_multiline_comment(filename) -> Generator[tuple[str, Snippet
     with open(filename, "r") as f:
         line = f.readline()
         while line:
-            if line.startswith(START_COMMENT):
+            if line.startswith(START_COMMENT) or \
+                any(line.startswith(prefix + START_COMMENT) for prefix in START_COMMENT_PREFIXES) or \
+                any(line.startswith(START_COMMENT + prefix) for prefix in START_COMMENT_PREFIXES_PERM):
                 # multiline comment
                 multiline_comment: str = ""
                 # single line multiline comment :(
