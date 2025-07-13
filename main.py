@@ -2,20 +2,42 @@
 import argparse
 from enum import Enum
 import os
+import site
 import sys
-from typing import Generator
+from typing import Generator, Literal
 
 from rich import print
+from rich.prompt import Confirm
 
 # persistent python console
 class PersistentPythonConsole:
-    def __init__(self, module_path: list[str] | None = None):
+    def __init__(self, module_path: list[str] | None = None, venv: Literal[True] | None = None):
         self.locals = {}
+        self.python_version = f"python{sys.version_info.major}.{sys.version_info.minor}"
+        # detect an active venv
+        venv_path = os.getenv("VIRTUAL_ENV")
+        if venv_path and os.path.exists(venv_path) and venv_path not in sys.path:
+            res = venv
+            if venv is None: res = Confirm.ask("[green]Venv detected\nDo you want to active it?[/green]", case_sensitive=False, default=True)
+            if res: self.activate_venv(venv_path)
+            else: print("[red]Venv not activated[/red]")
         if module_path:
             # add the search path to the sys.path
             for path in module_path:
                 if os.path.exists(path) and path not in sys.path: sys.path.append(path)
                 else: print(f"[bold red]Path {path} is not a directory or already in sys.path[/bold red]")
+
+    def activate_venv(self, venv_path: str):
+        site_packages_path = os.path.join(venv_path, "lib", self.python_version, "site-packages")
+
+        if site_packages_path not in sys.path:
+            sys.path.insert(0, site_packages_path)
+            site.addsitedir(site_packages_path)
+        
+        os.environ["VIRTUAL_ENV"] = venv_path
+        os.environ["PYTHONNOUSERSITE"] = "1"
+
+        print(f"[green]Activated venv site-packages from: {site_packages_path}[/green]")
 
     class NoPlotsContext:
         def __enter__(self):
@@ -66,6 +88,8 @@ def argparse_setup() -> argparse.Namespace:
                              "(only in interactive mode)")
     parser.add_argument("-l", "--load-path", type=str, nargs="+", default=None,
                         help="Additional paths to load modules from. If not specified, the current directory is used.")
+    parser.add_argument("--venv", action="store_true", default=None,
+                        help="Activate the virtual environment if detected. If not specified, the user will be prompted to activate it.")
     return parser.parse_args()
 
 class SnippetType(Enum):
@@ -127,9 +151,10 @@ def is_code_to_execute(snippet: str) -> bool:
     snippet = snippet.strip()
     return not (snippet.startswith("# pwmc:no_exec") or snippet.startswith("#pwmc:no_exec"))
 
-def python_w_multiline_comments(filename: str, interactive: bool = True, fast_forward: str | int | None = None, module_path: list[str] | None = None):
+def python_w_multiline_comments(filename: str, interactive: bool = True, fast_forward: str | int | None = None,
+                                module_path: list[str] | None = None, venv: Literal[True] | None = None):
     if module_path is None: module_path = ["."]  # default to current directory
-    console = PersistentPythonConsole(module_path)
+    console = PersistentPythonConsole(module_path, venv=venv)
     fast_forward_handler = FastForwardHandler(fast_forward) if fast_forward else None
     for code_or_comment, type_ in split_code_every_multiline_comment(filename):
         if type_ == SnippetType.comment:
@@ -149,7 +174,8 @@ def python_w_multiline_comments(filename: str, interactive: bool = True, fast_fo
                 continue
             in_val = input()
             if in_val == "q": break
+        else: print()
 
 if __name__ == "__main__":
     args = argparse_setup()
-    python_w_multiline_comments(args.filename, interactive=not args.all, fast_forward=args.fast_forward, module_path=args.load_path)
+    python_w_multiline_comments(args.filename, interactive=not args.all, fast_forward=args.fast_forward, module_path=args.load_path, venv=args.venv)
